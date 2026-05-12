@@ -1,0 +1,10 @@
+{
+  "name": "logger-extension-guide",
+  "private": true,
+  "scripts": {
+    "compile": "npm run compile --prefix devlog",
+    "watch": "npm run watch --prefix devlog",
+    "install:devlog": "npm install --prefix devlog",
+    "package:devlog": "npm run package --prefix devlog"
+  }
+}

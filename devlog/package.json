@@ -1,0 +1,83 @@
+{
+  "name": "devlog",
+  "displayName": "DevLog",
+  "description": "Watch AI agent file changes and stream plain-English lessons to a sidebar and Google Doc.",
+  "version": "0.1.0",
+  "publisher": "devlog",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "devlog.start",
+        "title": "Start DevLog",
+        "category": "DevLog"
+      },
+      {
+        "command": "devlog.setApiKey",
+        "title": "Set Gemini API Key",
+        "category": "DevLog"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "devlog",
+          "title": "DevLog",
+          "icon": "media/devlog.svg"
+        }
+      ]
+    },
+    "views": {
+      "devlog": [
+        {
+          "id": "devlog-panel",
+          "name": "Lessons",
+          "type": "webview"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "DevLog",
+      "properties": {
+        "devlog.geminiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Optional fallback Gemini API key. Prefer DevLog: Set Gemini API Key for long-term use.",
+          "markdownDescription": "Optional fallback when no stored API key is set. Prefer running **DevLog: Set Gemini API Key** so the key is saved in VS Code Secret Storage."
+        },
+        "devlog.googleDocId": {
+          "type": "string",
+          "default": "",
+          "description": "Google Doc ID to sync DevLog entries in real time."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --format=cjs --minify",
+    "watch": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --format=cjs --watch",
+    "vscode:prepublish": "npm run compile",
+    "package": "npm run compile && vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "chokidar": "^4.0.3",
+    "googleapis": "^144.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.85.0",
+  "@vscode/vsce": "^3.7.1",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}
