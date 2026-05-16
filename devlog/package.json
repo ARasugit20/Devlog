@@ -2,7 +2,7 @@
   "name": "devlog",
   "displayName": "DevLog",
   "description": "Turn AI coding agent changes into beginner-friendly lessons in your VS Code sidebar.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "devlog",
   "license": "MIT",
   "icon": "media/devlog-icon.png",
