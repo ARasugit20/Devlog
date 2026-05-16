@@ -48,6 +48,36 @@
         "command": "devlog.setApiKey",
         "title": "Set Gemini API Key",
         "category": "DevLog"
+      },
+      {
+        "command": "devlog.pause",
+        "title": "Pause DevLog Watcher",
+        "category": "DevLog"
+      },
+      {
+        "command": "devlog.resume",
+        "title": "Resume DevLog Watcher",
+        "category": "DevLog"
+      },
+      {
+        "command": "devlog.restart",
+        "title": "Restart DevLog",
+        "category": "DevLog"
+      },
+      {
+        "command": "devlog.privacyInfo",
+        "title": "Show DevLog Privacy Info",
+        "category": "DevLog"
+      },
+      {
+        "command": "devlog.testDocSync",
+        "title": "Test Google Docs Sync",
+        "category": "DevLog"
+      },
+      {
+        "command": "devlog.connectGoogleDocs",
+        "title": "Connect Google Docs (OAuth)",
+        "category": "DevLog"
       }
     ],
     "viewsContainers": {
@@ -77,10 +107,85 @@
           "description": "Optional fallback Gemini API key. Prefer DevLog: Set Gemini API Key for long-term use.",
           "markdownDescription": "Optional fallback when no stored API key is set. Prefer running **DevLog: Set Gemini API Key** so the key is saved in VS Code Secret Storage."
         },
+        "devlog.demoMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Preview DevLog with local sample explanations instead of calling Gemini.",
+          "markdownDescription": "Preview DevLog with local sample explanations instead of calling Gemini. Useful for testing the sidebar and batching without spending API quota."
+        },
+        "devlog.docsSyncEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Google Docs sync for lessons."
+        },
         "devlog.googleDocId": {
           "type": "string",
           "default": "",
           "description": "Google Doc ID to sync DevLog entries in real time."
+        },
+        "devlog.googleOAuthCredentialsPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Google OAuth desktop credentials JSON (optional; preferred over ADC)."
+        },
+        "devlog.includeFilePaths": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include relative file paths in prompts sent to Gemini."
+        },
+        "devlog.redactSecrets": {
+          "type": "boolean",
+          "default": true,
+          "description": "Redact likely secrets before sending diffs to Gemini."
+        },
+        "devlog.maxFileSizeKb": {
+          "type": "number",
+          "default": 512,
+          "minimum": 16,
+          "description": "Skip files larger than this size (KB)."
+        },
+        "devlog.maxDiffChars": {
+          "type": "number",
+          "default": 12000,
+          "minimum": 800,
+          "description": "Maximum characters kept per generated diff."
+        },
+        "devlog.maxPromptChars": {
+          "type": "number",
+          "default": 12000,
+          "minimum": 1200,
+          "description": "Maximum prompt size sent to Gemini after redaction."
+        },
+        "devlog.maxLessons": {
+          "type": "number",
+          "default": 250,
+          "minimum": 20,
+          "description": "Maximum lessons retained in workspace storage."
+        },
+        "devlog.excludeGlobs": {
+          "type": "array",
+          "description": "Glob patterns to exclude from watching and translation.",
+          "default": [
+            "**/.git/**",
+            "**/node_modules/**",
+            "**/dist/**",
+            "**/out/**",
+            "**/build/**",
+            "**/coverage/**",
+            "**/.next/**",
+            "**/.turbo/**",
+            "**/.vercel/**",
+            "**/*.lock",
+            "**/*.png",
+            "**/*.jpg",
+            "**/*.jpeg",
+            "**/*.gif",
+            "**/*.webp",
+            "**/*.pdf"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       }
     }
@@ -89,18 +194,29 @@
     "compile": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --format=cjs --minify",
     "watch": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --format=cjs --watch",
     "vscode:prepublish": "npm run compile",
-    "package": "npm run compile && vsce package --no-dependencies"
+    "package": "npm run compile && vsce package --no-dependencies",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "vitest": {
+    "include": [
+      "src/**/*.test.ts"
+    ]
   },
   "dependencies": {
+    "@google-cloud/local-auth": "^3.0.1",
     "@google/generative-ai": "^0.24.1",
     "chokidar": "^4.0.3",
-    "googleapis": "^144.0.0"
+    "diff": "^9.0.0",
+    "googleapis": "^144.0.0",
+    "picomatch": "^4.0.4"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.24.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.4"
   }
 }

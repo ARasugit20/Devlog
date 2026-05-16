@@ -6,3 +6,5 @@ tsconfig.json
 **/*.map
 **/*.ts
 node_modules/.cache/**
+vitest.config.*
+**/*.test.*

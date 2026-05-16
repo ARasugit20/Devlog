@@ -1,6 +1,6 @@
 # DevLog
 
-DevLog is a VS Code extension that watches file changes made by AI coding agents (Cursor, Claude Code, GitHub Copilot, and similar tools), turns related edits into one plain-English lesson, streams those lessons into a sidebar panel, and can optionally sync them to a Google Doc.
+DevLog is a VS Code extension that watches workspace code changes, batches related edits into one plain-English lesson, streams lessons to a sidebar panel, and can optionally sync them to Google Docs.
 
 ## What it does
 
@@ -53,18 +53,47 @@ DevLog needs each user to provide their own Google Gemini API key for translatio
 
 After changing configuration, run **DevLog: Start DevLog** to restart watching.
 
+## Demo mode
+
+Turn on `devlog.demoMode` to preview the full sidebar and batching flow without calling Gemini or using API quota.
+
+1. Open VS Code or Cursor Settings.
+2. Search for **DevLog: Demo Mode**.
+3. Enable it, then run **DevLog: Start DevLog**.
+4. Edit a few files and wait about 2 seconds to see one local demo lesson.
+
+Demo mode uses simple local summaries. Turn it off and set a Gemini key when you want real AI explanations.
+
 ## Privacy
 
 - DevLog does not include or ship an API key.
 - Gemini keys entered with **DevLog: Set Gemini API Key** are stored in VS Code Secret Storage.
-- File paths and diffs are sent to Gemini so it can write the lesson summary.
-- Google Docs sync is optional and only runs when `devlog.googleDocId` is configured.
+- File paths and diffs may be sent to Gemini so it can write lesson summaries, unless demo mode is enabled.
+- Use settings such as `devlog.redactSecrets`, `devlog.includeFilePaths`, `devlog.maxFileSizeKb`, `devlog.maxDiffChars`, and `devlog.maxPromptChars` to limit data sent out.
+- Google Docs sync is optional and only runs when `devlog.docsSyncEnabled` is true.
+- Run **DevLog: Show DevLog Privacy Info** anytime for a data-sharing reminder.
 
 ## Google Docs sync
 
-- `devlog.googleDocId` — Google Doc ID to receive synced entries. If it is missing, DevLog skips Google Doc sync and logs a warning.
+- `devlog.docsSyncEnabled` — enables Docs sync.
+- `devlog.googleDocId` — target Google Doc ID.
+- `devlog.googleOAuthCredentialsPath` — path to Google OAuth desktop credentials JSON.
 
-For Google Docs sync, authenticate with a Google service account using Application Default Credentials. A common setup is to set `GOOGLE_APPLICATION_CREDENTIALS` to the path of your service account JSON file and share the target Google Doc with that service account email.
+Recommended setup:
+1. Set `devlog.docsSyncEnabled` to true.
+2. Set `devlog.googleDocId`.
+3. Set `devlog.googleOAuthCredentialsPath`.
+4. Run **DevLog: Connect Google Docs (OAuth)** and paste the auth code.
+5. Run **DevLog: Test Google Docs Sync**.
+
+Fallback setup (advanced): Application Default Credentials (`GOOGLE_APPLICATION_CREDENTIALS`) is still supported if OAuth credentials are not configured.
+
+## Controls and status
+
+- **DevLog: Start DevLog** — restart with latest settings.
+- **DevLog: Pause DevLog Watcher** / **Resume DevLog Watcher** — control active file watching.
+- Sidebar includes clear, pause, resume controls and status banner.
+- Lessons are persisted in workspace storage with configurable retention (`devlog.maxLessons`).
 
 ## Share DevLog with other users
 

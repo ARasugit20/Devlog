@@ -1,6 +1,10 @@
 const vscode = acquireVsCodeApi();
 const logFeed = document.getElementById('log-feed');
 const clearButton = document.getElementById('clear-button');
+const pauseButton = document.getElementById('pause-button');
+const resumeButton = document.getElementById('resume-button');
+const statusBanner = document.getElementById('status-banner');
+const emptyState = document.getElementById('empty-state');
 
 function formatTimestamp(value) {
   const date = new Date(value);
@@ -36,6 +40,7 @@ function prependEntry(entry) {
   }
   logFeed.prepend(createEntryCard(entry));
   logFeed.scrollTop = 0;
+  updateEmptyState();
 }
 
 function clearFeed() {
@@ -43,6 +48,22 @@ function clearFeed() {
     return;
   }
   logFeed.replaceChildren();
+  updateEmptyState();
+}
+
+function updateEmptyState() {
+  if (!emptyState || !logFeed) {
+    return;
+  }
+  emptyState.hidden = logFeed.childElementCount > 0;
+}
+
+function updateStatus(status) {
+  if (!statusBanner) {
+    return;
+  }
+  const message = status?.message || 'DevLog ready.';
+  statusBanner.textContent = message;
 }
 
 window.addEventListener('message', (event) => {
@@ -58,8 +79,22 @@ window.addEventListener('message', (event) => {
   if (message.type === 'clearLog') {
     clearFeed();
   }
+
+  if (message.type === 'status') {
+    updateStatus(message.status);
+  }
 });
 
 clearButton?.addEventListener('click', () => {
   vscode.postMessage({ command: 'clearLog' });
 });
+
+pauseButton?.addEventListener('click', () => {
+  vscode.postMessage({ command: 'pauseWatcher' });
+});
+
+resumeButton?.addEventListener('click', () => {
+  vscode.postMessage({ command: 'resumeWatcher' });
+});
+
+updateEmptyState();

@@ -2,7 +2,9 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './logger';
-import type { LogEntry } from './types';
+import { pauseWatcher, resumeWatcher } from './watcher';
+import { statusStore } from './status';
+import type { LogEntry, SidebarStatus } from './types';
 
 let currentView: vscode.WebviewView | undefined;
 
@@ -23,6 +25,10 @@ function postEntry(webview: vscode.Webview, entry: LogEntry): void {
   void webview.postMessage({ type: 'newEntry', entry });
 }
 
+function postStatus(webview: vscode.Webview, status: SidebarStatus): void {
+  void webview.postMessage({ type: 'status', status });
+}
+
 function bindWebview(webviewView: vscode.WebviewView, extensionUri: vscode.Uri): void {
   webviewView.webview.options = {
     enableScripts: true,
@@ -34,7 +40,15 @@ function bindWebview(webviewView: vscode.WebviewView, extensionUri: vscode.Uri):
     if (message.command === 'clearLog') {
       logger.clear();
     }
+    if (message.command === 'pauseWatcher') {
+      pauseWatcher();
+    }
+    if (message.command === 'resumeWatcher') {
+      resumeWatcher();
+    }
   });
+
+  postStatus(webviewView.webview, statusStore.get());
 
   for (const entry of logger.getAll()) {
     postEntry(webviewView.webview, entry);
@@ -70,6 +84,7 @@ export function createSidebar(context: vscode.ExtensionContext): void {
 
   logger.on('newEntry', onNewEntry);
   logger.on('clearLog', onClearLog);
+  statusStore.on('statusChanged', onStatusChanged);
 
   context.subscriptions.push(
     { dispose: () => logger.off('newEntry', onNewEntry) }
@@ -77,6 +92,9 @@ export function createSidebar(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     { dispose: () => logger.off('clearLog', onClearLog) }
+  );
+  context.subscriptions.push(
+    { dispose: () => statusStore.off('statusChanged', onStatusChanged) }
   );
 }
 
@@ -89,5 +107,11 @@ function onNewEntry(entry: LogEntry): void {
 function onClearLog(): void {
   if (currentView) {
     void currentView.webview.postMessage({ type: 'clearLog' });
+  }
+}
+
+function onStatusChanged(status: SidebarStatus): void {
+  if (currentView) {
+    postStatus(currentView.webview, status);
   }
 }

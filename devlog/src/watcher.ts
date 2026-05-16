@@ -1,86 +1,28 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import chokidar, { FSWatcher } from 'chokidar';
-import type { ChangeType, FileChange } from './types';
+import { DiffEngine } from './diffEngine';
+import { statusStore } from './status';
 import { translateBatch } from './translator';
 import { logger } from './logger';
 import { appendToDoc } from './docSync';
+import type { ChangeType, DevLogConfig, FileChange } from './types';
 
-const IGNORED = /(^|[/\\])(node_modules|\.git|\.next|out|dist|coverage|\.turbo|\.vercel)([/\\]|$)/;
 const DEBOUNCE_MS = 2000;
+const MAX_BUFFER_SIZE = 200;
 
-let watcher: FSWatcher | null = null;
-const previousContent = new Map<string, string>();
+let watchers: FSWatcher[] = [];
+let activeConfig: DevLogConfig | null = null;
+let diffEngine: DiffEngine | null = null;
+let watcherPaused = false;
 const debounceBuffer: FileChange[] = [];
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let flushChain = Promise.resolve();
 
-function shouldIgnore(filePath: string): boolean {
-  return IGNORED.test(filePath);
-}
-
-function toRelativePath(root: string, filePath: string): string {
-  return path.relative(root, filePath) || path.basename(filePath);
-}
-
-function generateDiff(before: string, after: string): string {
-  const beforeLines = before.split('\n');
-  const afterLines = after.split('\n');
-  const lines: string[] = [];
-  const maxLength = Math.max(beforeLines.length, afterLines.length);
-
-  for (let index = 0; index < maxLength; index += 1) {
-    const oldLine = beforeLines[index];
-    const newLine = afterLines[index];
-    if (oldLine === newLine) {
-      continue;
-    }
-    if (oldLine !== undefined) {
-      lines.push(`- ${oldLine}`);
-    }
-    if (newLine !== undefined) {
-      lines.push(`+ ${newLine}`);
-    }
-  }
-
-  return lines.join('\n') || '(no textual changes)';
-}
-
-function readFileSafe(filePath: string): string {
-  try {
-    return fs.readFileSync(filePath, 'utf8');
-  } catch {
-    return '';
-  }
-}
-
-function buildChange(
-  root: string,
-  filePath: string,
-  changeType: ChangeType
-): FileChange {
-  const relativePath = toRelativePath(root, filePath);
-  const before = previousContent.get(filePath) ?? '';
-  const after = changeType === 'deleted' ? '' : readFileSafe(filePath);
-  const diff = generateDiff(before, after);
-
-  if (changeType === 'deleted') {
-    previousContent.delete(filePath);
-  } else {
-    previousContent.set(filePath, after);
-  }
-
-  return {
-    filename: relativePath,
-    diff,
-    changeType,
-  };
+export function hasBufferedChangesForTests(): boolean {
+  return debounceBuffer.length > 0;
 }
 
 function upsertBufferedChange(change: FileChange): void {
-  const existingIndex = debounceBuffer.findIndex(
-    (bufferedChange) => bufferedChange.filename === change.filename
-  );
+  const existingIndex = debounceBuffer.findIndex((item) => item.absolutePath === change.absolutePath);
 
   if (existingIndex >= 0) {
     debounceBuffer[existingIndex] = change;
@@ -96,19 +38,43 @@ function flushBufferedChanges(): void {
   }
 
   const batch = debounceBuffer.splice(0, debounceBuffer.length);
-  flushChain = flushChain.then(async () => {
-    const entry = await translateBatch(batch);
-    if (!entry) {
-      return;
-    }
+  flushChain = flushChain
+    .then(async () => {
+      if (watcherPaused) {
+        statusStore.update({ watcher: 'paused', message: 'Watcher paused. Changes are buffered.' });
+        debounceBuffer.unshift(...batch);
+        return;
+      }
+      const entry = await translateBatch(batch);
+      if (!entry) {
+        return;
+      }
 
-    logger.addEntry(entry);
-    await appendToDoc(entry);
-  });
+      logger.addEntry(entry);
+      await appendToDoc(entry);
+    })
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : 'Unexpected watcher error.';
+      statusStore.update({ watcher: 'watching', translator: 'error', message });
+    });
 }
 
-function scheduleBufferedChange(root: string, filePath: string, changeType: ChangeType): void {
-  upsertBufferedChange(buildChange(root, filePath, changeType));
+async function scheduleBufferedChange(
+  rootPath: string,
+  filePath: string,
+  changeType: ChangeType
+): Promise<void> {
+  if (!diffEngine) {
+    return;
+  }
+  const change = await diffEngine.buildChange(rootPath, filePath, changeType);
+  if (!change) {
+    return;
+  }
+  upsertBufferedChange(change);
+  if (debounceBuffer.length > MAX_BUFFER_SIZE) {
+    debounceBuffer.splice(0, debounceBuffer.length - MAX_BUFFER_SIZE);
+  }
 
   if (debounceTimer) {
     clearTimeout(debounceTimer);
@@ -130,33 +96,67 @@ function clearDebounceState(): void {
   flushChain = Promise.resolve();
 }
 
-export function startWatcher(workspacePath: string): void {
+export async function startWatcher(config: DevLogConfig): Promise<void> {
+  if (!config.workspacePaths.length) {
+    statusStore.update({ watcher: 'stopped', message: 'Open a workspace folder to start watching.' });
+    return;
+  }
   stopWatcher();
-  previousContent.clear();
+  activeConfig = config;
+  diffEngine = new DiffEngine(config);
+  await diffEngine.seedWorkspaceBaseline(config.workspacePaths);
 
-  watcher = chokidar.watch(workspacePath, {
-    ignoreInitial: true,
-    ignored: (watchPath) => shouldIgnore(watchPath),
-    awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 100 },
+  watchers = config.workspacePaths.map((workspacePath) => {
+    const nextWatcher = chokidar.watch(workspacePath, {
+      ignoreInitial: true,
+      awaitWriteFinish: { stabilityThreshold: 250, pollInterval: 100 },
+    });
+
+    nextWatcher.on('add', (filePath) => {
+      void scheduleBufferedChange(workspacePath, filePath, 'created');
+    });
+    nextWatcher.on('change', (filePath) => {
+      void scheduleBufferedChange(workspacePath, filePath, 'modified');
+    });
+    nextWatcher.on('unlink', (filePath) => {
+      void scheduleBufferedChange(workspacePath, filePath, 'deleted');
+    });
+    nextWatcher.on('error', (error) => {
+      const message = error instanceof Error ? error.message : 'Unknown watcher error.';
+      statusStore.update({ watcher: 'watching', message });
+    });
+    return nextWatcher;
   });
 
-  watcher.on('add', (filePath) => {
-    scheduleBufferedChange(workspacePath, filePath, 'created');
-  });
-  watcher.on('change', (filePath) => {
-    scheduleBufferedChange(workspacePath, filePath, 'modified');
-  });
-  watcher.on('unlink', (filePath) => {
-    scheduleBufferedChange(workspacePath, filePath, 'deleted');
-  });
+  watcherPaused = false;
+  statusStore.update({ watcher: 'watching', message: 'Watching workspace changes.' });
 }
 
 export function stopWatcher(): void {
-  if (watcher) {
+  for (const watcher of watchers) {
     void watcher.close();
-    watcher = null;
   }
+  watchers = [];
 
-  previousContent.clear();
+  activeConfig = null;
+  diffEngine?.clear();
+  diffEngine = null;
+  watcherPaused = false;
   clearDebounceState();
+  statusStore.update({ watcher: 'stopped', message: 'Watcher stopped.' });
+}
+
+export function pauseWatcher(): void {
+  watcherPaused = true;
+  statusStore.update({ watcher: 'paused', message: 'Watcher paused. Click resume to continue.' });
+}
+
+export function resumeWatcher(): void {
+  watcherPaused = false;
+  if (activeConfig?.workspacePaths.length) {
+    statusStore.update({ watcher: 'watching', message: 'Watching workspace changes.' });
+  }
+  if (debounceBuffer.length > 0) {
+    flushBufferedChanges();
+  }
 }

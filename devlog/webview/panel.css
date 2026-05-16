@@ -26,6 +26,11 @@ body {
   margin-bottom: 12px;
 }
 
+.panel-controls {
+  display: flex;
+  gap: 8px;
+}
+
 .panel-header h1 {
   margin: 0;
   font-size: 16px;
@@ -42,8 +47,40 @@ body {
   cursor: pointer;
 }
 
+#pause-button,
+#resume-button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 #clear-button:hover {
   border-color: var(--accent);
+}
+
+#pause-button:hover,
+#resume-button:hover {
+  border-color: var(--accent);
+}
+
+.status-banner {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--surface);
+  font-size: 12px;
+}
+
+.empty-state {
+  margin: 0 0 10px;
+  color: var(--surface);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .log-feed {

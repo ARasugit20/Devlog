@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: devlog/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: devlog
+
+      - name: Compile
+        run: npm run compile
+        working-directory: devlog
+
+      - name: Test
+        run: npm test
+        working-directory: devlog
+
+      - name: Package
+        run: npm run package
+        working-directory: devlog

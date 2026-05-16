@@ -13,8 +13,16 @@
   <body>
     <header class="panel-header">
       <h1>DevLog</h1>
-      <button id="clear-button" type="button">Clear</button>
+      <div class="panel-controls">
+        <button id="pause-button" type="button">Pause</button>
+        <button id="resume-button" type="button">Resume</button>
+        <button id="clear-button" type="button">Clear</button>
+      </div>
     </header>
+    <section id="status-banner" class="status-banner" role="status"></section>
+    <p id="empty-state" class="empty-state">
+      No lessons yet. Make a few code changes to see beginner-friendly summaries.
+    </p>
     <main id="log-feed" class="log-feed" aria-live="polite"></main>
     <script src="{{scriptUri}}"></script>
   </body>

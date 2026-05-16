@@ -1,5 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { ChangeType, FileChange, LogEntry } from './types';
+import { randomUUID } from 'crypto';
+import { redactSecrets } from './privacy';
+import { statusStore } from './status';
+import type { ChangeType, FileChange, LogEntry, TranslatorOptions } from './types';
 
 const SYSTEM_PROMPT =
   'You are DevLog, a coding teacher. A file just changed. Explain what happened in 2-3 sentences a complete beginner would understand. No jargon. Give one concept name this change demonstrates (e.g. React Hook, API call, For loop). Return JSON only, no markdown, no backticks: { explanation: string, concept: string }';
@@ -13,11 +16,28 @@ interface GeminiResponse {
 }
 
 let client: GoogleGenerativeAI | null = null;
+let demoModeEnabled = false;
 let quotaPausedUntil = 0;
+let options: TranslatorOptions = {
+  includeFilePaths: true,
+  maxPromptChars: 12000,
+  redactSecrets: true,
+};
 
-export function initTranslator(apiKey: string): void {
+export function initTranslator(
+  apiKey: string,
+  demoMode = false,
+  nextOptions: Partial<TranslatorOptions> = {}
+): void {
   const trimmedKey = apiKey.trim();
+  demoModeEnabled = demoMode;
+  options = { ...options, ...nextOptions };
   client = trimmedKey ? new GoogleGenerativeAI(trimmedKey) : null;
+  if (!client && !demoModeEnabled) {
+    statusStore.update({ translator: 'paused', message: 'Gemini key is not configured.' });
+  } else {
+    statusStore.update({ translator: 'idle', message: undefined });
+  }
 }
 
 function buildEntry(
@@ -28,13 +48,14 @@ function buildEntry(
   concept: string
 ): LogEntry {
   return {
-    id: Date.now().toString(),
+    id: randomUUID(),
     timestamp: new Date().toISOString(),
     filename,
     changeType,
     diff,
     explanation,
     concept,
+    source: demoModeEnabled ? 'demo' : 'gemini',
   };
 }
 
@@ -64,21 +85,6 @@ function pauseForQuotaError(message: string): number {
   return seconds;
 }
 
-function quotaPauseEntry(
-  filename: string,
-  diff: string,
-  changeType: ChangeType,
-  seconds: number
-): LogEntry {
-  return buildEntry(
-    filename,
-    diff,
-    changeType,
-    `Gemini free-tier quota was exceeded. DevLog will pause translations for about ${seconds} seconds, then try again.`,
-    'Rate limit'
-  );
-}
-
 function formatTranslationError(error: unknown): string {
   const message = error instanceof Error ? error.message : 'Unknown translation error.';
   if (isQuotaError(message)) {
@@ -87,6 +93,82 @@ function formatTranslationError(error: unknown): string {
   }
 
   return 'DevLog could not translate this change right now. Try again after a short wait.';
+}
+
+function toLocalFallbackEntry(
+  filename: string,
+  diff: string,
+  changeType: ChangeType,
+  explanation: string,
+  concept = 'Local fallback',
+  warnings: string[] = []
+): LogEntry {
+  return {
+    id: randomUUID(),
+    timestamp: new Date().toISOString(),
+    filename,
+    changeType,
+    diff,
+    explanation,
+    concept,
+    source: 'local-fallback',
+    warnings,
+  };
+}
+
+function countChangedLines(diff: string): { added: number; removed: number } {
+  return diff.split('\n').reduce(
+    (counts, line) => {
+      if (line.startsWith('+ ')) {
+        counts.added += 1;
+      }
+      if (line.startsWith('- ')) {
+        counts.removed += 1;
+      }
+      return counts;
+    },
+    { added: 0, removed: 0 }
+  );
+}
+
+function demoExplanationForChange(
+  filename: string,
+  diff: string,
+  changeType: ChangeType
+): LogEntry {
+  const { added, removed } = countChangedLines(diff);
+  const explanation = `Demo mode: DevLog noticed that ${filename} was ${changeType}. It saw about ${added} added line(s) and ${removed} removed line(s), then turned that code movement into a short learning note. In the real version, Gemini would read the same change and explain what the code is doing in more specific beginner-friendly language.`;
+
+  return {
+    ...buildEntry(filename, diff, changeType, explanation, 'Demo lesson'),
+    source: 'demo',
+  };
+}
+
+function demoExplanationForBatch(
+  changes: FileChange[],
+  filename: string,
+  diff: string,
+  changeType: ChangeType
+): LogEntry {
+  const totals = changes.reduce(
+    (counts, change) => {
+      const changedLines = countChangedLines(change.diff);
+      counts.added += changedLines.added;
+      counts.removed += changedLines.removed;
+      return counts;
+    },
+    { added: 0, removed: 0 }
+  );
+  const fileList = changes.map((change) => change.filename).slice(0, 3).join(', ');
+  const extraFiles = changes.length > 3 ? ` and ${changes.length - 3} more` : '';
+  const explanation = `Demo mode: DevLog grouped ${changes.length} file change(s) together because they happened within the same short coding moment. The batch touched ${fileList}${extraFiles}, with about ${totals.added} added line(s) and ${totals.removed} removed line(s). Think of this as one complete agent action instead of a pile of separate edits. In the real version, Gemini would read these diffs and explain the overall idea in beginner-friendly language.`;
+
+  return {
+    ...buildEntry(filename, diff, changeType, explanation, 'Batched change'),
+    source: 'demo',
+    files: changes.map((change) => change.filename),
+  };
 }
 
 function summarizeBatchFilenames(changes: FileChange[]): string {
@@ -116,12 +198,79 @@ function summarizeBatchDiff(changes: FileChange[]): string {
 }
 
 function buildBatchUserMessage(changes: FileChange[]): string {
-  return changes
-    .map(
-      (change) =>
-        `File: ${change.filename}\nChange type: ${change.changeType}\nDiff:\n${change.diff}`
-    )
-    .join('\n\n');
+  const entries = changes.map((change) => {
+    const filenamePrefix = options.includeFilePaths ? `File: ${change.filename}\n` : '';
+    return `${filenamePrefix}Change type: ${change.changeType}\nDiff:\n${redactSecrets(
+      change.diff,
+      options.redactSecrets
+    )}`;
+  });
+  const message = entries.join('\n\n');
+  if (message.length <= options.maxPromptChars) {
+    return message;
+  }
+  return `${message.slice(0, options.maxPromptChars)}\n\n... prompt truncated for safety ...`;
+}
+
+async function callGemini(prompt: string): Promise<GeminiResponse> {
+  if (!client) {
+    throw new Error('Gemini client is not initialized.');
+  }
+  const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const result = await model.generateContent({
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: prompt }],
+      },
+    ],
+  });
+  return parseGeminiJson(result.response.text());
+}
+
+async function callGeminiWithRetry(prompt: string): Promise<GeminiResponse> {
+  const attempts = [0, 800, 1600];
+  let lastError: unknown = null;
+  for (const waitMs of attempts) {
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+    try {
+      return await callGemini(prompt);
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : '';
+      if (isQuotaError(message)) {
+        throw error;
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Gemini request failed.');
+}
+
+function buildPausedEntry(filename: string, diff: string, changeType: ChangeType): LogEntry {
+  const seconds = Math.max(1, Math.ceil((quotaPausedUntil - Date.now()) / 1000));
+  return toLocalFallbackEntry(
+    filename,
+    diff,
+    changeType,
+    `Gemini translation is paused due to rate limits. DevLog will retry automatically in about ${seconds} seconds.`,
+    'Rate limited',
+    ['queued-local-fallback']
+  );
+}
+
+function appendSkippedWarnings(changes: FileChange[], entry: LogEntry): LogEntry {
+  const warnings = changes
+    .filter((change) => change.skipped && change.skipReason)
+    .map((change) => `${change.filename}: ${change.skipReason}`);
+  if (warnings.length === 0) {
+    return entry;
+  }
+  return {
+    ...entry,
+    warnings,
+  };
 }
 
 export async function translateBatch(changes: FileChange[]): Promise<LogEntry | null> {
@@ -133,8 +282,13 @@ export async function translateBatch(changes: FileChange[]): Promise<LogEntry | 
   const changeType = summarizeBatchChangeType(changes);
   const diff = summarizeBatchDiff(changes);
 
+  if (demoModeEnabled) {
+    statusStore.update({ translator: 'idle', message: 'Demo mode is active.' });
+    return appendSkippedWarnings(changes, demoExplanationForBatch(changes, filename, diff, changeType));
+  }
+
   if (!client) {
-    return buildEntry(
+    return toLocalFallbackEntry(
       filename,
       diff,
       changeType,
@@ -144,36 +298,31 @@ export async function translateBatch(changes: FileChange[]): Promise<LogEntry | 
   }
 
   if (Date.now() < quotaPausedUntil) {
-    return null;
+    statusStore.update({ translator: 'paused', message: 'Gemini rate limit pause in effect.' });
+    return buildPausedEntry(filename, diff, changeType);
   }
 
-  const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
+  statusStore.update({ translator: 'working', message: undefined });
   try {
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `${BATCH_SYSTEM_PROMPT}\n\n${buildBatchUserMessage(changes)}` }],
-        },
-      ],
+    const { explanation, concept } = await callGeminiWithRetry(
+      `${BATCH_SYSTEM_PROMPT}\n\n${buildBatchUserMessage(changes)}`
+    );
+    statusStore.update({ translator: 'idle', message: undefined });
+    return appendSkippedWarnings(changes, {
+      ...buildEntry(filename, diff, changeType, explanation, concept),
+      files: changes.map((change) => change.filename),
     });
-    const text = result.response.text();
-    const { explanation, concept } = parseGeminiJson(text);
-    return buildEntry(filename, diff, changeType, explanation, concept);
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (isQuotaError(message)) {
-      const seconds = pauseForQuotaError(message);
-      return quotaPauseEntry(filename, diff, changeType, seconds);
+      pauseForQuotaError(message);
+      statusStore.update({ translator: 'paused', message: 'Gemini rate limit reached.' });
+      return buildPausedEntry(filename, diff, changeType);
     }
-
-    return buildEntry(
-      filename,
-      diff,
-      changeType,
-      formatTranslationError(error),
-      'Translation error'
+    statusStore.update({ translator: 'error', message: 'Gemini translation failed. Using fallback.' });
+    return appendSkippedWarnings(
+      changes,
+      toLocalFallbackEntry(filename, diff, changeType, formatTranslationError(error), 'Translation error')
     );
   }
 }
@@ -183,8 +332,12 @@ export async function translate(
   diff: string,
   changeType: ChangeType
 ): Promise<LogEntry | null> {
+  if (demoModeEnabled) {
+    return demoExplanationForChange(filename, diff, changeType);
+  }
+
   if (!client) {
-    return buildEntry(
+    return toLocalFallbackEntry(
       filename,
       diff,
       changeType,
@@ -194,27 +347,32 @@ export async function translate(
   }
 
   if (Date.now() < quotaPausedUntil) {
-    return null;
+    return buildPausedEntry(filename, diff, changeType);
   }
 
-  const userMessage = `File: ${filename}\nChange type: ${changeType}\nDiff:\n${diff}`;
-  const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  statusStore.update({ translator: 'working', message: undefined });
+  const safeFilename = options.includeFilePaths ? filename : 'current file';
+  const redactedDiff = redactSecrets(diff, options.redactSecrets);
+  const userMessage = `File: ${safeFilename}\nChange type: ${changeType}\nDiff:\n${redactedDiff}`;
+  const prompt =
+    userMessage.length > options.maxPromptChars
+      ? `${userMessage.slice(0, options.maxPromptChars)}\n\n... prompt truncated for safety ...`
+      : userMessage;
 
   try {
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: `${SYSTEM_PROMPT}\n\n${userMessage}` }] }],
-    });
-    const text = result.response.text();
-    const { explanation, concept } = parseGeminiJson(text);
+    const { explanation, concept } = await callGeminiWithRetry(`${SYSTEM_PROMPT}\n\n${prompt}`);
+    statusStore.update({ translator: 'idle', message: undefined });
     return buildEntry(filename, diff, changeType, explanation, concept);
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (isQuotaError(message)) {
-      const seconds = pauseForQuotaError(message);
-      return quotaPauseEntry(filename, diff, changeType, seconds);
+      pauseForQuotaError(message);
+      statusStore.update({ translator: 'paused', message: 'Gemini rate limit reached.' });
+      return buildPausedEntry(filename, diff, changeType);
     }
 
-    return buildEntry(
+    statusStore.update({ translator: 'error', message: 'Gemini translation failed. Using fallback.' });
+    return toLocalFallbackEntry(
       filename,
       diff,
       changeType,
