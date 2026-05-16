@@ -1,12 +1,12 @@
 # DevLog
 
-DevLog is a VS Code extension that watches file changes made by AI coding agents (Cursor, Claude Code, GitHub Copilot, and similar tools), turns each change into a short plain-English lesson, streams those lessons into a sidebar panel, and syncs them to a Google Doc in real time.
+DevLog is a VS Code extension that watches file changes made by AI coding agents (Cursor, Claude Code, GitHub Copilot, and similar tools), turns related edits into one plain-English lesson, streams those lessons into a sidebar panel, and can optionally sync them to a Google Doc.
 
 ## What it does
 
 - Watches the open workspace for file create, modify, and delete events.
-- Builds a simple line diff for each change.
-- Sends the diff to Gemini and asks for a beginner-friendly explanation plus one concept label.
+- Groups changes that happen within 2 seconds into one agent-action lesson.
+- Sends the batched diff to Gemini and asks for a beginner-friendly explanation plus one concept label.
 - Appends each lesson to the DevLog sidebar (newest first).
 - Appends the same lesson to a configured Google Doc when sync is available.
 
@@ -43,7 +43,7 @@ npm run compile
 
 ## Gemini API key
 
-DevLog needs a Google Gemini API key for long-running translation.
+DevLog needs each user to provide their own Google Gemini API key for translation.
 
 1. Create an API key in [Google AI Studio](https://aistudio.google.com/apikey).
 2. In VS Code or Cursor, run **DevLog: Set Gemini API Key** from the Command Palette.
@@ -52,6 +52,13 @@ DevLog needs a Google Gemini API key for long-running translation.
 `devlog.geminiApiKey` still works as a fallback, but the command is the recommended setup for everyday use.
 
 After changing configuration, run **DevLog: Start DevLog** to restart watching.
+
+## Privacy
+
+- DevLog does not include or ship an API key.
+- Gemini keys entered with **DevLog: Set Gemini API Key** are stored in VS Code Secret Storage.
+- File paths and diffs are sent to Gemini so it can write the lesson summary.
+- Google Docs sync is optional and only runs when `devlog.googleDocId` is configured.
 
 ## Google Docs sync
 
@@ -63,3 +70,16 @@ For Google Docs sync, authenticate with a Google service account using Applicati
 
 - Send them the built `.vsix` file and the install steps above.
 - For wider distribution, publish the extension to the Visual Studio Marketplace with `npx vsce publish` after creating a publisher account.
+
+## Publish to the Visual Studio Marketplace
+
+1. Create a Visual Studio Marketplace publisher.
+2. Update `publisher` in `devlog/package.json` to exactly match your Marketplace publisher id.
+3. Login and publish from the `devlog` folder:
+
+```bash
+npx @vscode/vsce login <publisher-id>
+npx @vscode/vsce publish
+```
+
+The package includes Marketplace metadata, a license, changelog, repository links, and a packaged extension icon.

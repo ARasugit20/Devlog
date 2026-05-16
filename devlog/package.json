@@ -1,9 +1,29 @@
 {
   "name": "devlog",
   "displayName": "DevLog",
-  "description": "Watch AI agent file changes and stream plain-English lessons to a sidebar and Google Doc.",
+  "description": "Turn AI coding agent changes into beginner-friendly lessons in your VS Code sidebar.",
   "version": "0.1.0",
   "publisher": "devlog",
+  "license": "MIT",
+  "icon": "media/devlog-icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ARasugit20/Devlog.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ARasugit20/Devlog/issues"
+  },
+  "homepage": "https://github.com/ARasugit20/Devlog#readme",
+  "keywords": [
+    "devlog",
+    "ai",
+    "learning",
+    "vibecoding",
+    "beginner",
+    "gemini",
+    "sidebar",
+    "code-education"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -12,6 +32,9 @@
   ],
   "activationEvents": [
     "onStartupFinished"
+  ],
+  "extensionKind": [
+    "workspace"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -76,7 +99,7 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/vscode": "^1.85.0",
-  "@vscode/vsce": "^3.7.1",
+    "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.24.0",
     "typescript": "^5.7.0"
   }

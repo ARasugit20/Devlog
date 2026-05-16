@@ -3,5 +3,8 @@ devlog/node_modules/
 devlog/out/
 devlog/*.vsix
 *.vsix
+/package-lock.json
+devlog-test-change.txt
+**/.vscode/Untitled
 .env
 .env.*
