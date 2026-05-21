@@ -1,11 +1,30 @@
 # DevLog
 
+[![CI](https://github.com/ARasugit20/Devlog/actions/workflows/ci.yml/badge.svg)](https://github.com/ARasugit20/Devlog/actions/workflows/ci.yml)
+![Version](https://img.shields.io/badge/version-0.1.1-blue)
+<!-- Marketplace badge: enable after publish
+[![Visual Studio Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/<publisher>.devlog)](https://marketplace.visualstudio.com/items?itemName=<publisher>.devlog)
+-->
+
+![DevLog sidebar demo](devlog/media/devlog-demo.png)
+
 DevLog is a VS Code extension that watches workspace code changes, batches related edits into one plain-English lesson, streams lessons to a sidebar panel, and can optionally sync them to Google Docs.
+
+## Why DevLog?
+
+DevLog is not another inline chat box. It is a persistent learning journal of what changed while you code.
+
+- Batches related multi-file edits into one lesson instead of scattered explanations.
+- Writes beginner-first summaries with concept labels.
+- Keeps a sidebar history you can review after the coding session.
+- Includes privacy controls and demo mode without API spend.
+
+Unlike “just ask Cursor,” DevLog keeps a running lesson trail of what changed, when, and why it matters.
 
 ## What it does
 
 - Watches the open workspace for file create, modify, and delete events.
-- Groups changes that happen within 2 seconds into one agent-action lesson.
+- Groups changes that happen within 2 seconds into one coding-session lesson.
 - Sends the batched diff to Gemini and asks for a beginner-friendly explanation plus one concept label.
 - Appends each lesson to the DevLog sidebar (newest first).
 - Appends the same lesson to a configured Google Doc when sync is available.
@@ -24,7 +43,7 @@ npm run package
 ```
 
 2. In VS Code or Cursor, open the Command Palette and run **Extensions: Install from VSIX...**.
-3. Select the generated `devlog-0.1.0.vsix` file.
+3. Select the generated `devlog-0.1.1.vsix` file.
 4. Reload the editor when prompted.
 5. Open the DevLog activity bar icon on the left and choose **Lessons**.
 
@@ -73,6 +92,8 @@ Demo mode uses simple local summaries. Turn it off and set a Gemini key when you
 - Google Docs sync is optional and only runs when `devlog.docsSyncEnabled` is true.
 - Run **DevLog: Show DevLog Privacy Info** anytime for a data-sharing reminder.
 
+Read the full privacy notes in [docs/PRIVACY.md](docs/PRIVACY.md).
+
 ## Google Docs sync
 
 - `devlog.docsSyncEnabled` — enables Docs sync.
@@ -87,6 +108,8 @@ Recommended setup:
 5. Run **DevLog: Test Google Docs Sync**.
 
 Fallback setup (advanced): Application Default Credentials (`GOOGLE_APPLICATION_CREDENTIALS`) is still supported if OAuth credentials are not configured.
+
+Read the full setup guide in [docs/GOOGLE_DOCS.md](docs/GOOGLE_DOCS.md).
 
 ## Controls and status
 
@@ -112,3 +135,18 @@ npx @vscode/vsce publish
 ```
 
 The package includes Marketplace metadata, a license, changelog, repository links, and a packaged extension icon.
+
+## Open VSX
+
+Open VSX publishing is a stretch distribution path for editors that consume Open VSX.
+
+```bash
+cd devlog
+npx ovsx publish devlog-0.1.1.vsix
+```
+
+Create an Open VSX namespace first and use the matching publisher/namespace.
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for test, compile, package, and F5 development instructions.

@@ -31,6 +31,16 @@ jobs:
         run: npm test
         working-directory: devlog
 
+      - name: Audit high severity dependencies
+        run: npm audit --audit-level=high
+        working-directory: devlog
+
       - name: Package
         run: npm run package
         working-directory: devlog
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: devlog-vsix
+          path: devlog/devlog-*.vsix

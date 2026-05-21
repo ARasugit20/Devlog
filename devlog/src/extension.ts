@@ -64,6 +64,38 @@ function loggerConfigFromSettings(config: DevLogConfig): void {
   logger.setMaxEntries(config.maxLessons);
 }
 
+function openMarkdownDoc(context: vscode.ExtensionContext, relativePath: string): void {
+  const target = vscode.Uri.joinPath(context.extensionUri, relativePath);
+  void vscode.commands.executeCommand('vscode.open', target);
+}
+
+async function showFirstRunMessage(context: vscode.ExtensionContext): Promise<void> {
+  const seenKey = 'devlog.firstRunSeen';
+  if (context.globalState.get<boolean>(seenKey, false)) {
+    return;
+  }
+  await context.globalState.update(seenKey, true);
+  const choice = await vscode.window.showInformationMessage(
+    'DevLog starts safely in demo mode until you add a Gemini key. You can preview the sidebar without network calls.',
+    'Set API Key',
+    'Keep Demo Mode',
+    'Privacy Info'
+  );
+
+  if (choice === 'Set API Key') {
+    await promptForGeminiApiKey(context);
+  }
+  if (choice === 'Keep Demo Mode') {
+    await vscode.workspace
+      .getConfiguration('devlog')
+      .update('demoMode', true, vscode.ConfigurationTarget.Global);
+    await activateDevLog(context);
+  }
+  if (choice === 'Privacy Info') {
+    openMarkdownDoc(context, 'docs/PRIVACY.md');
+  }
+}
+
 async function promptForGeminiApiKey(context: vscode.ExtensionContext): Promise<void> {
   const apiKey = await vscode.window.showInputBox({
     title: 'DevLog Gemini API Key',
@@ -87,6 +119,7 @@ export function activate(context: vscode.ExtensionContext): void {
   createSidebar(context);
   wireLessonPersistence(context);
   void activateDevLog(context);
+  void showFirstRunMessage(context);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('devlog.start', () => {
@@ -126,9 +159,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('devlog.privacyInfo', () => {
-      void vscode.window.showInformationMessage(
-        'DevLog can send diffs to Gemini for explanations. Use devlog.redactSecrets, devlog.includeFilePaths, max size/length limits, and demo mode to control data sharing.'
-      );
+      openMarkdownDoc(context, 'docs/PRIVACY.md');
     })
   );
 

@@ -11,6 +11,28 @@ let syncEnabled = false;
 let activeAuthMode: 'oauth' | 'adc' | null = null;
 let oauthClientConfig: { clientId: string; clientSecret: string; redirectUri: string } | null = null;
 
+export function resetDocSyncStateForTests(): void {
+  docsClient = null;
+  activeDocId = '';
+  syncEnabled = false;
+  activeAuthMode = null;
+  oauthClientConfig = null;
+}
+
+export function setDocSyncClientForTests(client: docs_v1.Docs | null): void {
+  docsClient = client;
+}
+
+export function setDocSyncStateForTests(state: {
+  activeDocId?: string;
+  syncEnabled?: boolean;
+  activeAuthMode?: 'oauth' | 'adc' | null;
+}): void {
+  activeDocId = state.activeDocId ?? activeDocId;
+  syncEnabled = state.syncEnabled ?? syncEnabled;
+  activeAuthMode = state.activeAuthMode ?? activeAuthMode;
+}
+
 function getOAuthCredentialsPath(): string | null {
   return (
     vscode.workspace.getConfiguration('devlog').get<string>('googleOAuthCredentialsPath', '').trim() ||
@@ -53,6 +75,7 @@ async function getOAuthTokenPath(): Promise<string> {
   const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
   const tokenDir = vscode.Uri.joinPath(vscode.Uri.file(rootPath), '.devlog');
   await vscode.workspace.fs.createDirectory(tokenDir);
+  await fs.writeFile(vscode.Uri.joinPath(tokenDir, '.gitignore').fsPath, '*\n', 'utf8');
   return vscode.Uri.joinPath(tokenDir, 'google-oauth-token.json').fsPath;
 }
 
@@ -141,7 +164,7 @@ export async function initDocSync(docId: string, enabled: boolean): Promise<void
   }
 }
 
-function formatEntry(entry: LogEntry): string {
+export function formatEntry(entry: LogEntry): string {
   return `\n[${entry.timestamp}] ${entry.filename} — ${entry.concept}\n${entry.explanation}\n---`;
 }
 

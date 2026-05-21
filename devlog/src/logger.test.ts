@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { logger } from './logger';
 import type { LogEntry } from './types';
 
@@ -29,5 +29,43 @@ describe('logger retention', () => {
     expect(entries).toHaveLength(3);
     expect(entries[0].id).toBe('4');
     expect(entries[2].id).toBe('2');
+  });
+
+  it('emits newEntry when an entry is added', () => {
+    logger.clear();
+    const listener = vi.fn();
+    logger.on('newEntry', listener);
+    const entry = createEntry(10);
+
+    logger.addEntry(entry);
+
+    expect(listener).toHaveBeenCalledWith(entry);
+    logger.off('newEntry', listener);
+  });
+
+  it('emits clearLog when cleared', () => {
+    const listener = vi.fn();
+    logger.on('clearLog', listener);
+
+    logger.clear();
+
+    expect(listener).toHaveBeenCalled();
+    logger.off('clearLog', listener);
+  });
+
+  it('getAll returns a copy', () => {
+    logger.clear();
+    logger.addEntry(createEntry(1));
+    const copy = logger.getAll();
+    copy.length = 0;
+
+    expect(logger.getAll()).toHaveLength(1);
+  });
+
+  it('setAll replaces and respects retention', () => {
+    logger.setMaxEntries(2);
+    logger.setAll([createEntry(1), createEntry(2), createEntry(3)]);
+
+    expect(logger.getAll().map((entry) => entry.id)).toEqual(['1', '2']);
   });
 });

@@ -14,4 +14,24 @@ describe('redactSecrets', () => {
     const input = 'keep-me';
     expect(redactSecrets(input, false)).toBe(input);
   });
+
+  it('redacts Google Gemini-style keys', () => {
+    const input = 'key=AIzaSyabcdefghijklmnopqrstuvwxyz123456';
+    expect(redactSecrets(input, true)).not.toContain('AIzaSyabcdefghijklmnopqrstuvwxyz123456');
+  });
+
+  it('redacts Slack-style bot tokens', () => {
+    const token = ['xoxb', '1234567890', 'redactedplaceholder'].join('-');
+    const input = `SLACK=${token}`;
+    expect(redactSecrets(input, true)).not.toContain(token);
+  });
+
+  it('redacts labeled passwords', () => {
+    const input = 'password: supersecretvalue';
+    expect(redactSecrets(input, true)).toBe('password: [REDACTED]');
+  });
+
+  it('handles empty strings safely', () => {
+    expect(redactSecrets('', true)).toBe('');
+  });
 });

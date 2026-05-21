@@ -16,9 +16,28 @@ let watcherPaused = false;
 const debounceBuffer: FileChange[] = [];
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let flushChain = Promise.resolve();
+let scheduleChain = Promise.resolve();
 
 export function hasBufferedChangesForTests(): boolean {
   return debounceBuffer.length > 0;
+}
+
+export function getBufferedChangeCountForTests(): number {
+  return debounceBuffer.length;
+}
+
+export async function flushBufferedChangesForTests(): Promise<void> {
+  await scheduleChain;
+  flushBufferedChanges();
+  await flushChain;
+}
+
+export async function waitForPendingChangeBuildsForTests(): Promise<void> {
+  await scheduleChain;
+}
+
+export function resetWatcherStateForTests(): void {
+  stopWatcher();
 }
 
 function upsertBufferedChange(change: FileChange): void {
@@ -86,6 +105,15 @@ async function scheduleBufferedChange(
   }, DEBOUNCE_MS);
 }
 
+function queueBufferedChange(rootPath: string, filePath: string, changeType: ChangeType): void {
+  scheduleChain = scheduleChain
+    .then(() => scheduleBufferedChange(rootPath, filePath, changeType))
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : 'Unexpected file change error.';
+      statusStore.update({ watcher: 'watching', translator: 'error', message });
+    });
+}
+
 function clearDebounceState(): void {
   if (debounceTimer) {
     clearTimeout(debounceTimer);
@@ -94,6 +122,7 @@ function clearDebounceState(): void {
 
   debounceBuffer.length = 0;
   flushChain = Promise.resolve();
+  scheduleChain = Promise.resolve();
 }
 
 export async function startWatcher(config: DevLogConfig): Promise<void> {
@@ -113,13 +142,13 @@ export async function startWatcher(config: DevLogConfig): Promise<void> {
     });
 
     nextWatcher.on('add', (filePath) => {
-      void scheduleBufferedChange(workspacePath, filePath, 'created');
+      queueBufferedChange(workspacePath, filePath, 'created');
     });
     nextWatcher.on('change', (filePath) => {
-      void scheduleBufferedChange(workspacePath, filePath, 'modified');
+      queueBufferedChange(workspacePath, filePath, 'modified');
     });
     nextWatcher.on('unlink', (filePath) => {
-      void scheduleBufferedChange(workspacePath, filePath, 'deleted');
+      queueBufferedChange(workspacePath, filePath, 'deleted');
     });
     nextWatcher.on('error', (error) => {
       const message = error instanceof Error ? error.message : 'Unknown watcher error.';

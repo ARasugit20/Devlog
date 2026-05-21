@@ -186,6 +186,10 @@ export class DiffEngine {
 
     const before = this.previousContent.get(filePath) ?? '';
     const after = changeType === 'deleted' ? '' : toText(buffer ?? Buffer.from(''));
+    if (before === after) {
+      return null;
+    }
+
     const patch = createTwoFilesPatch(relativePath, relativePath, before, after, '', '', {
       context: 3,
     }).trim();

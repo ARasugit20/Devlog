@@ -1,8 +1,10 @@
 {
-  "name": "logger-extension-guide",
+  "name": "devlog-monorepo",
+  "description": "Workspace for the DevLog VS Code/Cursor extension.",
   "private": true,
   "scripts": {
     "compile": "npm run compile --prefix devlog",
+    "test": "npm test --prefix devlog",
     "watch": "npm run watch --prefix devlog",
     "install:devlog": "npm install --prefix devlog",
     "package:devlog": "npm run package --prefix devlog"

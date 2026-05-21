@@ -1,9 +1,11 @@
 {
   "name": "devlog",
   "displayName": "DevLog",
-  "description": "Turn AI coding agent changes into beginner-friendly lessons in your VS Code sidebar.",
+  "description": "Turn workspace code changes into beginner-friendly lessons in your VS Code sidebar.",
   "version": "0.1.1",
   "publisher": "devlog",
+  "//publisherNote": "Replace devlog with your verified Visual Studio Marketplace publisher id before publishing.",
+  "preview": true,
   "license": "MIT",
   "icon": "media/devlog-icon.png",
   "repository": {
@@ -28,6 +30,7 @@
     "vscode": "^1.85.0"
   },
   "categories": [
+    "Education",
     "Other"
   ],
   "activationEvents": [
@@ -204,10 +207,10 @@
     ]
   },
   "dependencies": {
-    "@google-cloud/local-auth": "^3.0.1",
     "@google/generative-ai": "^0.24.1",
     "chokidar": "^4.0.3",
     "diff": "^9.0.0",
+    "google-auth-library": "^10.6.2",
     "googleapis": "^144.0.0",
     "picomatch": "^4.0.4"
   },

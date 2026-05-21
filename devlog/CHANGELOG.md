@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Added README demo screenshot placeholder and recording instructions.
+- Added standalone Privacy and Google Docs setup docs.
+- Expanded mocked unit coverage across translator, watcher, doc sync, storage, settings, status, privacy, logger, and diffing.
+- Removed the unused single-file translator path; DevLog now uses the batched translation path only.
+- Added first-run demo/privacy prompt and OAuth token gitignore guidance.
+- Added CI audit gate and VSIX artifact upload.
+- Cleaned packaging docs and distribution metadata for 0.1.1.
+
 ## 0.1.1
 
 - Hardened watcher and diffing pipeline with baseline seeding, binary/large-file skipping, truncation limits, and configurable exclude globs.

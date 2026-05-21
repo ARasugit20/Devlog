@@ -4,11 +4,8 @@ import { redactSecrets } from './privacy';
 import { statusStore } from './status';
 import type { ChangeType, FileChange, LogEntry, TranslatorOptions } from './types';
 
-const SYSTEM_PROMPT =
-  'You are DevLog, a coding teacher. A file just changed. Explain what happened in 2-3 sentences a complete beginner would understand. No jargon. Give one concept name this change demonstrates (e.g. React Hook, API call, For loop). Return JSON only, no markdown, no backticks: { explanation: string, concept: string }';
-
 const BATCH_SYSTEM_PROMPT =
-  'You are DevLog, a coding teacher. These files all changed together as part of one agent action. Explain in 3-4 sentences what was built or changed overall, like a teacher explaining one complete thought to a beginner. No jargon. Give one concept name for the overall change (e.g. React Hook, API call, For loop). Return JSON only, no markdown, no backticks: { explanation: string, concept: string }';
+  'You are DevLog, a coding teacher. These files all changed together as part of one coding session. Explain in 3-4 sentences what was built or changed overall, like a teacher explaining one complete thought to a beginner. No jargon. Give one concept name for the overall change (e.g. React Hook, API call, For loop). Return JSON only, no markdown, no backticks: { explanation: string, concept: string }';
 
 interface GeminiResponse {
   explanation: string;
@@ -23,6 +20,17 @@ let options: TranslatorOptions = {
   maxPromptChars: 12000,
   redactSecrets: true,
 };
+
+export function resetTranslatorStateForTests(): void {
+  client = null;
+  demoModeEnabled = false;
+  quotaPausedUntil = 0;
+  options = {
+    includeFilePaths: true,
+    maxPromptChars: 12000,
+    redactSecrets: true,
+  };
+}
 
 export function initTranslator(
   apiKey: string,
@@ -59,7 +67,7 @@ function buildEntry(
   };
 }
 
-function parseGeminiJson(text: string): GeminiResponse {
+export function parseGeminiJson(text: string): GeminiResponse {
   const trimmed = text.trim();
   const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
@@ -74,7 +82,7 @@ function parseGeminiJson(text: string): GeminiResponse {
   return { explanation: parsed.explanation, concept: parsed.concept };
 }
 
-function isQuotaError(message: string): boolean {
+export function isQuotaError(message: string): boolean {
   return /429|quota exceeded|rate limit|too many requests/i.test(message);
 }
 
@@ -85,7 +93,7 @@ function pauseForQuotaError(message: string): number {
   return seconds;
 }
 
-function formatTranslationError(error: unknown): string {
+export function formatTranslationError(error: unknown): string {
   const message = error instanceof Error ? error.message : 'Unknown translation error.';
   if (isQuotaError(message)) {
     const seconds = pauseForQuotaError(message);
@@ -116,7 +124,7 @@ function toLocalFallbackEntry(
   };
 }
 
-function countChangedLines(diff: string): { added: number; removed: number } {
+export function countChangedLines(diff: string): { added: number; removed: number } {
   return diff.split('\n').reduce(
     (counts, line) => {
       if (line.startsWith('+ ')) {
@@ -129,20 +137,6 @@ function countChangedLines(diff: string): { added: number; removed: number } {
     },
     { added: 0, removed: 0 }
   );
-}
-
-function demoExplanationForChange(
-  filename: string,
-  diff: string,
-  changeType: ChangeType
-): LogEntry {
-  const { added, removed } = countChangedLines(diff);
-  const explanation = `Demo mode: DevLog noticed that ${filename} was ${changeType}. It saw about ${added} added line(s) and ${removed} removed line(s), then turned that code movement into a short learning note. In the real version, Gemini would read the same change and explain what the code is doing in more specific beginner-friendly language.`;
-
-  return {
-    ...buildEntry(filename, diff, changeType, explanation, 'Demo lesson'),
-    source: 'demo',
-  };
 }
 
 function demoExplanationForBatch(
@@ -162,7 +156,7 @@ function demoExplanationForBatch(
   );
   const fileList = changes.map((change) => change.filename).slice(0, 3).join(', ');
   const extraFiles = changes.length > 3 ? ` and ${changes.length - 3} more` : '';
-  const explanation = `Demo mode: DevLog grouped ${changes.length} file change(s) together because they happened within the same short coding moment. The batch touched ${fileList}${extraFiles}, with about ${totals.added} added line(s) and ${totals.removed} removed line(s). Think of this as one complete agent action instead of a pile of separate edits. In the real version, Gemini would read these diffs and explain the overall idea in beginner-friendly language.`;
+  const explanation = `Demo mode: DevLog grouped ${changes.length} file change(s) together because they happened within the same short coding moment. The batch touched ${fileList}${extraFiles}, with about ${totals.added} added line(s) and ${totals.removed} removed line(s). Think of this as one complete coding-session change instead of a pile of separate edits. In the real version, Gemini would read these diffs and explain the overall idea in beginner-friendly language.`;
 
   return {
     ...buildEntry(filename, diff, changeType, explanation, 'Batched change'),
@@ -171,7 +165,7 @@ function demoExplanationForBatch(
   };
 }
 
-function summarizeBatchFilenames(changes: FileChange[]): string {
+export function summarizeBatchFilenames(changes: FileChange[]): string {
   if (changes.length === 1) {
     return changes[0].filename;
   }
@@ -179,7 +173,7 @@ function summarizeBatchFilenames(changes: FileChange[]): string {
   return `${changes.length} files`;
 }
 
-function summarizeBatchChangeType(changes: FileChange[]): ChangeType {
+export function summarizeBatchChangeType(changes: FileChange[]): ChangeType {
   const firstType = changes[0]?.changeType;
   if (firstType && changes.every((change) => change.changeType === firstType)) {
     return firstType;
@@ -188,7 +182,7 @@ function summarizeBatchChangeType(changes: FileChange[]): ChangeType {
   return 'modified';
 }
 
-function summarizeBatchDiff(changes: FileChange[]): string {
+export function summarizeBatchDiff(changes: FileChange[]): string {
   return changes
     .map(
       (change) =>
@@ -197,7 +191,7 @@ function summarizeBatchDiff(changes: FileChange[]): string {
     .join('\n\n---\n\n');
 }
 
-function buildBatchUserMessage(changes: FileChange[]): string {
+export function buildBatchUserMessage(changes: FileChange[]): string {
   const entries = changes.map((change) => {
     const filenamePrefix = options.includeFilePaths ? `File: ${change.filename}\n` : '';
     return `${filenamePrefix}Change type: ${change.changeType}\nDiff:\n${redactSecrets(
@@ -212,11 +206,14 @@ function buildBatchUserMessage(changes: FileChange[]): string {
   return `${message.slice(0, options.maxPromptChars)}\n\n... prompt truncated for safety ...`;
 }
 
-async function callGemini(prompt: string): Promise<GeminiResponse> {
+async function callGemini(systemInstruction: string, prompt: string): Promise<GeminiResponse> {
   if (!client) {
     throw new Error('Gemini client is not initialized.');
   }
-  const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const model = client.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    systemInstruction,
+  });
   const result = await model.generateContent({
     contents: [
       {
@@ -228,7 +225,10 @@ async function callGemini(prompt: string): Promise<GeminiResponse> {
   return parseGeminiJson(result.response.text());
 }
 
-async function callGeminiWithRetry(prompt: string): Promise<GeminiResponse> {
+async function callGeminiWithRetry(
+  systemInstruction: string,
+  prompt: string
+): Promise<GeminiResponse> {
   const attempts = [0, 800, 1600];
   let lastError: unknown = null;
   for (const waitMs of attempts) {
@@ -236,7 +236,7 @@ async function callGeminiWithRetry(prompt: string): Promise<GeminiResponse> {
       await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
     try {
-      return await callGemini(prompt);
+      return await callGemini(systemInstruction, prompt);
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : '';
@@ -273,6 +273,8 @@ function appendSkippedWarnings(changes: FileChange[], entry: LogEntry): LogEntry
   };
 }
 
+export { appendSkippedWarnings };
+
 export async function translateBatch(changes: FileChange[]): Promise<LogEntry | null> {
   if (changes.length === 0) {
     return null;
@@ -305,7 +307,8 @@ export async function translateBatch(changes: FileChange[]): Promise<LogEntry | 
   statusStore.update({ translator: 'working', message: undefined });
   try {
     const { explanation, concept } = await callGeminiWithRetry(
-      `${BATCH_SYSTEM_PROMPT}\n\n${buildBatchUserMessage(changes)}`
+      BATCH_SYSTEM_PROMPT,
+      buildBatchUserMessage(changes)
     );
     statusStore.update({ translator: 'idle', message: undefined });
     return appendSkippedWarnings(changes, {
@@ -327,57 +330,3 @@ export async function translateBatch(changes: FileChange[]): Promise<LogEntry | 
   }
 }
 
-export async function translate(
-  filename: string,
-  diff: string,
-  changeType: ChangeType
-): Promise<LogEntry | null> {
-  if (demoModeEnabled) {
-    return demoExplanationForChange(filename, diff, changeType);
-  }
-
-  if (!client) {
-    return toLocalFallbackEntry(
-      filename,
-      diff,
-      changeType,
-      'Run DevLog: Set Gemini API Key to enable explanations.',
-      'Not configured'
-    );
-  }
-
-  if (Date.now() < quotaPausedUntil) {
-    return buildPausedEntry(filename, diff, changeType);
-  }
-
-  statusStore.update({ translator: 'working', message: undefined });
-  const safeFilename = options.includeFilePaths ? filename : 'current file';
-  const redactedDiff = redactSecrets(diff, options.redactSecrets);
-  const userMessage = `File: ${safeFilename}\nChange type: ${changeType}\nDiff:\n${redactedDiff}`;
-  const prompt =
-    userMessage.length > options.maxPromptChars
-      ? `${userMessage.slice(0, options.maxPromptChars)}\n\n... prompt truncated for safety ...`
-      : userMessage;
-
-  try {
-    const { explanation, concept } = await callGeminiWithRetry(`${SYSTEM_PROMPT}\n\n${prompt}`);
-    statusStore.update({ translator: 'idle', message: undefined });
-    return buildEntry(filename, diff, changeType, explanation, concept);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (isQuotaError(message)) {
-      pauseForQuotaError(message);
-      statusStore.update({ translator: 'paused', message: 'Gemini rate limit reached.' });
-      return buildPausedEntry(filename, diff, changeType);
-    }
-
-    statusStore.update({ translator: 'error', message: 'Gemini translation failed. Using fallback.' });
-    return toLocalFallbackEntry(
-      filename,
-      diff,
-      changeType,
-      formatTranslationError(error),
-      'Translation error'
-    );
-  }
-}
