@@ -38,6 +38,9 @@ jobs:
       - name: Package
         run: npm run package
         working-directory: devlog
+        env:
+          # Ensures vsce/secretlint never see os.cpus().length === 0 on CI runners.
+          NODE_OPTIONS: --require ./scripts/vsce-preload.cjs
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4

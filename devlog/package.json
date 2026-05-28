@@ -219,7 +219,7 @@
     "compile": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --format=cjs --minify",
     "watch": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --format=cjs --watch",
     "vscode:prepublish": "npm run compile",
-    "package": "npm run compile && vsce package --no-dependencies",
+    "package": "npm run compile && node --require ./scripts/vsce-preload.cjs ./node_modules/@vscode/vsce/vsce package --no-dependencies",
     "test": "vitest run",
     "test:watch": "vitest"
   },
