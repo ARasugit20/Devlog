@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1
+
+- No more confusing lessons about Python cache files or build folders
+- Lessons now have a concept label, plain-English explanation, and a "why it matters" line
+- New: loading indicator while DevLog is thinking
+- New: open the changed file or copy a lesson with one click
+- Fresh installs show a demo lesson immediately — no API key needed to see how it works
+- UI now follows your editor's color theme automatically
+
 ## Unreleased
 
 - Added README demo screenshot placeholder and recording instructions.
@@ -9,16 +18,6 @@
 - Added first-run demo/privacy prompt and OAuth token gitignore guidance.
 - Added CI audit gate and VSIX artifact upload.
 - Cleaned packaging docs and distribution metadata for 0.1.1.
-
-## 0.1.1
-
-- Hardened watcher and diffing pipeline with baseline seeding, binary/large-file skipping, truncation limits, and configurable exclude globs.
-- Added privacy controls: redaction, include-file-path toggle, prompt limits, and privacy info command.
-- Added translator reliability improvements: retry/backoff, rate-limit status handling, and local fallback lessons instead of silent drops.
-- Added persisted lesson history with configurable retention.
-- Added sidebar status banner, pause/resume controls, and richer UX states.
-- Added Docs sync controls and test command, with OAuth credentials path support and non-blocking status reporting.
-- Added initial automated tests and CI workflow for compile/test/package.
 
 ## 0.1.0
 

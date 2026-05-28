@@ -21,11 +21,14 @@ vi.mock('googleapis', () => ({
 function entry(): LogEntry {
   return {
     id: '1',
-    timestamp: '2026-01-01T00:00:00.000Z',
+    timestamp: Date.parse('2026-01-01T00:00:00.000Z'),
+    files: ['src/app.ts'],
     filename: 'src/app.ts',
     changeType: 'modified',
     diff: 'diff',
+    summary: 'A value was stored.',
     explanation: 'The code now stores a value.',
+    whyItMatters: 'Variables let your program remember data.',
     concept: 'Variable',
     source: 'demo',
   };
@@ -43,9 +46,9 @@ describe('docSync', () => {
 
     const text = formatEntry(entry());
 
-    expect(text).toContain('src/app.ts');
     expect(text).toContain('Variable');
     expect(text).toContain('The code now stores a value.');
+    expect(text).toContain('Why it matters');
   });
 
   it('appendToDoc no-ops when sync is disabled', async () => {

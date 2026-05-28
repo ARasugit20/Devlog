@@ -6,38 +6,127 @@ const resumeButton = document.getElementById('resume-button');
 const statusBanner = document.getElementById('status-banner');
 const emptyState = document.getElementById('empty-state');
 
+let skeletonNode = null;
+
 function formatTimestamp(value) {
-  const date = new Date(value);
+  const date = new Date(typeof value === 'number' ? value : value);
   if (Number.isNaN(date.getTime())) {
-    return value;
+    return String(value);
   }
   return date.toLocaleString();
+}
+
+function formatFilesLabel(entry) {
+  if (entry.files && entry.files.length > 1) {
+    return `${entry.files.length} files`;
+  }
+  return entry.files?.[0] ?? entry.filename ?? 'unknown';
 }
 
 function createEntryCard(entry) {
   const card = document.createElement('article');
   card.className = 'entry-card';
+  card.dataset.entryId = entry.id;
+
+  const header = document.createElement('div');
+  header.className = 'entry-header';
 
   const title = document.createElement('h2');
   title.className = 'entry-title';
   title.textContent = entry.concept;
 
+  const time = document.createElement('span');
+  time.className = 'entry-time';
+  time.textContent = formatTimestamp(entry.timestamp);
+
+  header.append(title, time);
+
   const meta = document.createElement('p');
   meta.className = 'entry-meta';
-  meta.textContent = `${entry.filename} · ${formatTimestamp(entry.timestamp)}`;
+  meta.textContent = formatFilesLabel(entry);
+
+  const summary = document.createElement('p');
+  summary.className = 'entry-summary';
+  summary.textContent = entry.summary ?? '';
 
   const body = document.createElement('p');
   body.className = 'entry-body';
-  body.textContent = entry.explanation;
+  body.textContent = entry.explanation ?? '';
 
-  card.append(title, meta, body);
+  const why = document.createElement('p');
+  why.className = 'entry-why';
+  why.textContent = `💡 ${entry.whyItMatters ?? ''}`;
+
+  card.append(header, meta, summary, body, why);
+
+  if (entry.reflectionQuestion) {
+    const reflection = document.createElement('p');
+    reflection.className = 'entry-reflection';
+    reflection.textContent = `🤔 ${entry.reflectionQuestion}`;
+    card.append(reflection);
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'entry-actions';
+
+  const openButton = document.createElement('button');
+  openButton.type = 'button';
+  openButton.className = 'entry-action';
+  openButton.textContent = 'Open file';
+  const openPath = entry.files?.[0] ?? entry.filename;
+  openButton.addEventListener('click', () => {
+    vscode.postMessage({ command: 'openFile', path: openPath });
+  });
+
+  const copyButton = document.createElement('button');
+  copyButton.type = 'button';
+  copyButton.className = 'entry-action';
+  copyButton.textContent = 'Copy lesson';
+  copyButton.addEventListener('click', () => {
+    vscode.postMessage({ command: 'copyLesson', id: entry.id });
+  });
+
+  actions.append(openButton, copyButton);
+  card.append(actions);
+
   return card;
+}
+
+function createSkeletonCard() {
+  const card = document.createElement('article');
+  card.className = 'entry-card devlog-skeleton';
+  card.id = 'devlog-skeleton-card';
+  card.setAttribute('aria-busy', 'true');
+  card.textContent = 'Analyzing your changes…';
+  return card;
+}
+
+function showSkeleton() {
+  if (!logFeed || skeletonNode) {
+    return;
+  }
+  skeletonNode = createSkeletonCard();
+  logFeed.prepend(skeletonNode);
+  updateEmptyState();
+}
+
+function removeSkeleton() {
+  if (skeletonNode) {
+    skeletonNode.remove();
+    skeletonNode = null;
+  }
+  const existing = document.getElementById('devlog-skeleton-card');
+  if (existing) {
+    existing.remove();
+  }
+  updateEmptyState();
 }
 
 function prependEntry(entry) {
   if (!logFeed) {
     return;
   }
+  removeSkeleton();
   logFeed.prepend(createEntryCard(entry));
   logFeed.scrollTop = 0;
   updateEmptyState();
@@ -48,6 +137,7 @@ function clearFeed() {
     return;
   }
   logFeed.replaceChildren();
+  skeletonNode = null;
   updateEmptyState();
 }
 
@@ -55,7 +145,8 @@ function updateEmptyState() {
   if (!emptyState || !logFeed) {
     return;
   }
-  emptyState.hidden = logFeed.childElementCount > 0;
+  const visibleCards = logFeed.querySelectorAll('.entry-card:not(.devlog-skeleton)');
+  emptyState.hidden = visibleCards.length > 0;
 }
 
 function updateStatus(status) {
@@ -82,6 +173,14 @@ window.addEventListener('message', (event) => {
 
   if (message.type === 'status') {
     updateStatus(message.status);
+  }
+
+  if (message.type === 'skeleton') {
+    showSkeleton();
+  }
+
+  if (message.type === 'removeSkeleton') {
+    removeSkeleton();
   }
 });
 

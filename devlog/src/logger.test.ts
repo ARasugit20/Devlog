@@ -3,14 +3,18 @@ import { logger } from './logger';
 import type { LogEntry } from './types';
 
 function createEntry(index: number): LogEntry {
+  const timestamp = Date.now() + index;
   return {
     id: `${index}`,
-    timestamp: new Date().toISOString(),
+    timestamp,
+    files: [`file-${index}.ts`],
     filename: `file-${index}.ts`,
     changeType: 'modified',
     diff: 'diff',
-    explanation: 'explanation',
     concept: 'concept',
+    summary: 'summary',
+    explanation: 'explanation',
+    whyItMatters: 'why',
     source: 'local-fallback',
   };
 }
@@ -41,6 +45,14 @@ describe('logger retention', () => {
 
     expect(listener).toHaveBeenCalledWith(entry);
     logger.off('newEntry', listener);
+  });
+
+  it('finds entries by id', () => {
+    logger.clear();
+    const entry = createEntry(42);
+    logger.addEntry(entry);
+
+    expect(logger.getById('42')).toEqual(entry);
   });
 
   it('emits clearLog when cleared', () => {

@@ -22,6 +22,10 @@ class DevLogLogger extends EventEmitter {
     return [...this.entries];
   }
 
+  getById(id: string): LogEntry | undefined {
+    return this.entries.find((entry) => entry.id === id);
+  }
+
   setAll(entries: LogEntry[]): void {
     this.entries = [...entries].slice(0, this.maxEntries);
     this.emit('clearLog');

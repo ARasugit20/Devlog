@@ -1,5 +1,8 @@
 import chokidar, { FSWatcher } from 'chokidar';
+import * as path from 'path';
 import { DiffEngine } from './diffEngine';
+import { logDevLog } from './outputChannel';
+import { isExcluded, loadExcludePatterns } from './settings';
 import { statusStore } from './status';
 import { translateBatch } from './translator';
 import { logger } from './logger';
@@ -40,6 +43,28 @@ export function resetWatcherStateForTests(): void {
   stopWatcher();
 }
 
+export function partitionBatchForTests(
+  batch: FileChange[]
+): { included: FileChange[]; excludedCount: number } {
+  return partitionBatch(batch);
+}
+
+function partitionBatch(batch: FileChange[]): { included: FileChange[]; excludedCount: number } {
+  const patterns = loadExcludePatterns();
+  const included: FileChange[] = [];
+  let excludedCount = 0;
+
+  for (const change of batch) {
+    if (isExcluded(change.filename, patterns)) {
+      excludedCount += 1;
+    } else {
+      included.push(change);
+    }
+  }
+
+  return { included, excludedCount };
+}
+
 function upsertBufferedChange(change: FileChange): void {
   const existingIndex = debounceBuffer.findIndex((item) => item.absolutePath === change.absolutePath);
 
@@ -57,14 +82,25 @@ function flushBufferedChanges(): void {
   }
 
   const batch = debounceBuffer.splice(0, debounceBuffer.length);
+  const { included, excludedCount } = partitionBatch(batch);
+
+  if (included.length === 0) {
+    logDevLog(`[DevLog] Skipped artifact-only batch (${excludedCount} files filtered)`);
+    return;
+  }
+
+  if (excludedCount > 0) {
+    logDevLog(`[DevLog] Filtered ${excludedCount} artifact path(s) from batch`);
+  }
+
   flushChain = flushChain
     .then(async () => {
       if (watcherPaused) {
         statusStore.update({ watcher: 'paused', message: 'Watcher paused. Changes are buffered.' });
-        debounceBuffer.unshift(...batch);
+        debounceBuffer.unshift(...included);
         return;
       }
-      const entry = await translateBatch(batch);
+      const entry = await translateBatch(included);
       if (!entry) {
         return;
       }
@@ -86,6 +122,13 @@ async function scheduleBufferedChange(
   if (!diffEngine) {
     return;
   }
+
+  const relativePath = path.relative(rootPath, filePath) || path.basename(filePath);
+  const patterns = loadExcludePatterns();
+  if (isExcluded(relativePath.replace(/\\/g, '/'), patterns)) {
+    return;
+  }
+
   const change = await diffEngine.buildChange(rootPath, filePath, changeType);
   if (!change) {
     return;

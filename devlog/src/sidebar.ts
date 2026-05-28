@@ -4,7 +4,7 @@ import * as path from 'path';
 import { logger } from './logger';
 import { pauseWatcher, resumeWatcher } from './watcher';
 import { statusStore } from './status';
-import type { LogEntry, SidebarStatus } from './types';
+import { formatLessonForClipboard, type LogEntry, type SidebarStatus } from './types';
 
 let currentView: vscode.WebviewView | undefined;
 
@@ -29,6 +29,25 @@ function postStatus(webview: vscode.Webview, status: SidebarStatus): void {
   void webview.postMessage({ type: 'status', status });
 }
 
+function postSkeleton(webview: vscode.Webview): void {
+  void webview.postMessage({ type: 'skeleton' });
+}
+
+function postRemoveSkeleton(webview: vscode.Webview): void {
+  void webview.postMessage({ type: 'removeSkeleton' });
+}
+
+async function openLessonFile(relativePath: string): Promise<void> {
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  if (!folder) {
+    void vscode.window.showWarningMessage('Open a workspace folder to open this file.');
+    return;
+  }
+  const target = vscode.Uri.joinPath(folder.uri, relativePath);
+  const document = await vscode.workspace.openTextDocument(target);
+  await vscode.window.showTextDocument(document, { preview: true });
+}
+
 function bindWebview(webviewView: vscode.WebviewView, extensionUri: vscode.Uri): void {
   webviewView.webview.options = {
     enableScripts: true,
@@ -36,7 +55,7 @@ function bindWebview(webviewView: vscode.WebviewView, extensionUri: vscode.Uri):
   };
   webviewView.webview.html = getWebviewHtml(webviewView.webview, extensionUri);
 
-  webviewView.webview.onDidReceiveMessage((message: { command?: string }) => {
+  webviewView.webview.onDidReceiveMessage((message: { command?: string; path?: string; id?: string }) => {
     if (message.command === 'clearLog') {
       logger.clear();
     }
@@ -45,6 +64,16 @@ function bindWebview(webviewView: vscode.WebviewView, extensionUri: vscode.Uri):
     }
     if (message.command === 'resumeWatcher') {
       resumeWatcher();
+    }
+    if (message.command === 'openFile' && message.path) {
+      void openLessonFile(message.path);
+    }
+    if (message.command === 'copyLesson' && message.id) {
+      const entry = logger.getById(message.id);
+      if (entry) {
+        void vscode.env.clipboard.writeText(formatLessonForClipboard(entry));
+        void vscode.window.setStatusBarMessage('DevLog lesson copied to clipboard.', 3000);
+      }
     }
   });
 
@@ -100,6 +129,7 @@ export function createSidebar(context: vscode.ExtensionContext): void {
 
 function onNewEntry(entry: LogEntry): void {
   if (currentView) {
+    postRemoveSkeleton(currentView.webview);
     postEntry(currentView.webview, entry);
   }
 }
@@ -111,7 +141,13 @@ function onClearLog(): void {
 }
 
 function onStatusChanged(status: SidebarStatus): void {
-  if (currentView) {
-    postStatus(currentView.webview, status);
+  if (!currentView) {
+    return;
+  }
+  postStatus(currentView.webview, status);
+  if (status.translator === 'working') {
+    postSkeleton(currentView.webview);
+  } else {
+    postRemoveSkeleton(currentView.webview);
   }
 }

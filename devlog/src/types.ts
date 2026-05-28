@@ -1,12 +1,18 @@
-export interface LogEntry {
+export interface Lesson {
   id: string;
-  timestamp: string;
+  timestamp: number;
+  files: string[];
+  concept: string;
+  summary: string;
+  explanation: string;
+  whyItMatters: string;
+  reflectionQuestion?: string;
+}
+
+export interface LogEntry extends Lesson {
   filename: string;
   changeType: 'created' | 'modified' | 'deleted';
   diff: string;
-  explanation: string;
-  concept: string;
-  files?: string[];
   source: 'gemini' | 'demo' | 'local-fallback';
   warnings?: string[];
 }
@@ -53,4 +59,38 @@ export interface TranslatorOptions {
 export interface OAuthConnectionResult {
   connected: boolean;
   detail: string;
+}
+
+export function formatLessonForClipboard(entry: Lesson): string {
+  const lines = [`${entry.concept}`, '', entry.explanation, '', `💡 ${entry.whyItMatters}`];
+  if (entry.reflectionQuestion) {
+    lines.push('', `🤔 ${entry.reflectionQuestion}`);
+  }
+  return lines.join('\n');
+}
+
+export function normalizeStoredEntry(raw: Partial<LogEntry> & Partial<Lesson>): LogEntry {
+  const timestamp =
+    typeof raw.timestamp === 'number'
+      ? raw.timestamp
+      : typeof raw.timestamp === 'string'
+        ? Date.parse(raw.timestamp) || Date.now()
+        : Date.now();
+  const files = raw.files?.length ? raw.files : raw.filename ? [raw.filename] : ['unknown'];
+  const filename = raw.filename ?? files[0];
+  return {
+    id: raw.id ?? `${timestamp}`,
+    timestamp,
+    files,
+    concept: raw.concept ?? 'Lesson',
+    summary: raw.summary ?? raw.explanation?.slice(0, 120) ?? '',
+    explanation: raw.explanation ?? '',
+    whyItMatters: raw.whyItMatters ?? 'This change helps you understand how your project evolves.',
+    reflectionQuestion: raw.reflectionQuestion,
+    filename,
+    changeType: raw.changeType ?? 'modified',
+    diff: raw.diff ?? '',
+    source: raw.source ?? 'local-fallback',
+    warnings: raw.warnings,
+  };
 }

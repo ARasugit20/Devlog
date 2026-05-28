@@ -27,6 +27,10 @@ vi.mock('./docSync', () => ({
   appendToDoc,
 }));
 
+vi.mock('./outputChannel', () => ({
+  logDevLog: vi.fn(),
+}));
+
 function config(workspacePath: string): DevLogConfig {
   return {
     geminiApiKey: '',
@@ -45,14 +49,18 @@ function config(workspacePath: string): DevLogConfig {
 }
 
 function entry(): LogEntry {
+  const timestamp = Date.now();
   return {
     id: '1',
-    timestamp: 'now',
+    timestamp,
+    files: ['file.ts'],
     filename: 'file.ts',
     changeType: 'modified',
     diff: 'diff',
-    explanation: 'x',
-    concept: 'x',
+    concept: 'Variable',
+    summary: 'A variable changed.',
+    explanation: 'You changed a value.',
+    whyItMatters: 'It helps you track state.',
     source: 'demo',
   };
 }

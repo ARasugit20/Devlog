@@ -165,7 +165,18 @@ export async function initDocSync(docId: string, enabled: boolean): Promise<void
 }
 
 export function formatEntry(entry: LogEntry): string {
-  return `\n[${entry.timestamp}] ${entry.filename} — ${entry.concept}\n${entry.explanation}\n---`;
+  const when = new Date(entry.timestamp).toISOString();
+  const lines = [
+    `\n[${when}] ${entry.concept}`,
+    entry.summary,
+    entry.explanation,
+    `Why it matters: ${entry.whyItMatters}`,
+  ];
+  if (entry.reflectionQuestion) {
+    lines.push(`Reflection: ${entry.reflectionQuestion}`);
+  }
+  lines.push('---');
+  return lines.join('\n');
 }
 
 async function getDocumentEndIndex(docId: string): Promise<number> {

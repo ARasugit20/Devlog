@@ -1,12 +1,3 @@
-:root {
-  --bg: #1e1e1e;
-  --surface: #ffffff;
-  --text: #1f2933;
-  --muted: #6b7280;
-  --border: #d1d5db;
-  --accent: #2563eb;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -14,9 +5,9 @@
 body {
   margin: 0;
   padding: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
 }
 
 .panel-header {
@@ -34,86 +25,144 @@ body {
 .panel-header h1 {
   margin: 0;
   font-size: 16px;
-  color: var(--surface);
+  color: var(--vscode-editor-foreground);
 }
 
-#clear-button {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  border-radius: 8px;
+.panel-controls button {
+  border: 1px solid var(--vscode-button-background);
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-radius: 6px;
   padding: 6px 10px;
   font-size: 12px;
   cursor: pointer;
 }
 
-#pause-button,
-#resume-button {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-#clear-button:hover {
-  border-color: var(--accent);
-}
-
-#pause-button:hover,
-#resume-button:hover {
-  border-color: var(--accent);
+.panel-controls button:hover {
+  background: var(--vscode-button-hoverBackground);
 }
 
 .status-banner {
   margin-bottom: 10px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(37, 99, 235, 0.15);
-  color: var(--surface);
+  background: var(--vscode-badge-background);
+  color: var(--vscode-editor-foreground);
   font-size: 12px;
 }
 
 .empty-state {
   margin: 0 0 10px;
-  color: var(--surface);
+  color: var(--vscode-descriptionForeground);
   font-size: 12px;
   line-height: 1.5;
 }
 
 .log-feed {
-  max-height: calc(100vh - 72px);
+  max-height: calc(100vh - 120px);
   overflow-y: auto;
 }
 
 .entry-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 16px;
-  margin-bottom: 8px;
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-textBlockQuote-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
   animation: slide-in 0.3s ease;
 }
 
+.entry-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
 .entry-title {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 14px;
   font-weight: 700;
+  flex: 1;
+}
+
+.entry-time {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
 }
 
 .entry-meta {
   margin: 0 0 8px;
   font-size: 11px;
-  color: var(--muted);
+  color: var(--vscode-descriptionForeground);
+}
+
+.entry-summary {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--vscode-descriptionForeground);
+  line-height: 1.5;
 }
 
 .entry-body {
-  margin: 0;
+  margin: 0 0 8px;
   font-size: 13px;
   line-height: 1.6;
-  font-weight: 400;
+}
+
+.entry-why {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--vscode-descriptionForeground);
+}
+
+.entry-reflection {
+  margin: 0 0 10px;
+  padding-left: 10px;
+  border-left: 3px solid var(--vscode-textBlockQuote-border);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--vscode-editor-foreground);
+}
+
+.entry-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.entry-action {
+  border: 1px solid var(--vscode-button-background);
+  background: transparent;
+  color: var(--vscode-button-foreground);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.entry-action:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.devlog-skeleton {
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 @keyframes slide-in {

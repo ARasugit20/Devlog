@@ -165,6 +165,28 @@
           "minimum": 20,
           "description": "Maximum lessons retained in workspace storage."
         },
+        "devlog.excludePatterns": {
+          "type": "array",
+          "description": "Glob patterns for build artifacts and generated files to skip (no lessons).",
+          "default": [
+            "**/__pycache__/**",
+            "**/*.pyc",
+            "**/*.pyo",
+            "**/.venv/**",
+            "**/.pytest_cache/**",
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/dist/**",
+            "**/build/**",
+            "**/.next/**",
+            "**/*.min.js",
+            "**/*.js.map",
+            "**/*.d.ts.map"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "devlog.excludeGlobs": {
           "type": "array",
           "description": "Glob patterns to exclude from watching and translation.",

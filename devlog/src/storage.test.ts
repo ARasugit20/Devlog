@@ -4,14 +4,18 @@ import { restoreLessons, wireLessonPersistence } from './storage';
 import type { LogEntry } from './types';
 
 function entry(id: string): LogEntry {
+  const timestamp = Date.now();
   return {
     id,
-    timestamp: 'now',
+    timestamp,
+    files: [`${id}.ts`],
     filename: `${id}.ts`,
     changeType: 'modified',
     diff: 'diff',
-    explanation: 'explanation',
     concept: 'concept',
+    summary: 'summary',
+    explanation: 'explanation',
+    whyItMatters: 'why',
     source: 'demo',
   };
 }
@@ -33,6 +37,31 @@ describe('lesson persistence', () => {
     await restoreLessons(context([entry('1'), entry('2'), entry('3')]) as never, 2);
 
     expect(logger.getAll().map((item) => item.id)).toEqual(['1', '2']);
+  });
+
+  it('normalizes legacy string timestamps on restore', async () => {
+    logger.clear();
+    await restoreLessons(
+      context([
+        {
+          id: 'legacy',
+          timestamp: '2026-01-01T00:00:00.000Z' as unknown as number,
+          files: ['legacy.ts'],
+          filename: 'legacy.ts',
+          changeType: 'modified',
+          diff: 'diff',
+          concept: 'Legacy',
+          summary: '',
+          explanation: 'legacy',
+          whyItMatters: 'legacy',
+          source: 'demo',
+        },
+      ]) as never,
+      10
+    );
+
+    const restored = logger.getById('legacy');
+    expect(typeof restored?.timestamp).toBe('number');
   });
 
   it('persists lessons when logger changes', () => {

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { logger } from './logger';
-import type { LogEntry } from './types';
+import { normalizeStoredEntry, type LogEntry } from './types';
 
 const LESSONS_KEY = 'devlog.lessons';
 
@@ -8,9 +8,10 @@ export async function restoreLessons(
   context: vscode.ExtensionContext,
   maxEntries: number
 ): Promise<void> {
-  const stored = context.workspaceState.get<LogEntry[]>(LESSONS_KEY, []);
+  const stored = context.workspaceState.get<Array<Partial<LogEntry>>>(LESSONS_KEY, []);
+  const normalized = stored.map((entry) => normalizeStoredEntry(entry)).slice(0, maxEntries);
   logger.setMaxEntries(maxEntries);
-  logger.setAll(stored.slice(0, maxEntries));
+  logger.setAll(normalized);
 }
 
 export function wireLessonPersistence(context: vscode.ExtensionContext): void {

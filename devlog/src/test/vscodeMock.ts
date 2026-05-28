@@ -46,6 +46,9 @@ export const Uri = {
 };
 
 export const window = {
+  createOutputChannel(): { appendLine: (value: string) => void } {
+    return { appendLine: () => undefined };
+  },
   async showInformationMessage(): Promise<undefined> {
     return undefined;
   },
@@ -72,6 +75,11 @@ export const commands = {
 export const env = {
   async openExternal(): Promise<boolean> {
     return true;
+  },
+  clipboard: {
+    async writeText(): Promise<void> {
+      return undefined;
+    },
   },
 };
 
